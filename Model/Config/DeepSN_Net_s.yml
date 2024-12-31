@@ -1,0 +1,8 @@
+in_channel : 3
+ratio_spatial : 1
+ratio_freq : 1
+depth : 6
+repeat : 1
+downsampling_ratio : 4
+coefficient : 4
+
