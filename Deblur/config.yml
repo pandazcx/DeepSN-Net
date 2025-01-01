@@ -3,8 +3,8 @@ Version : DeepSN_Net
 datasets :
   train :
     path : /mnt/ssd4/zhangcx/data/Gopro/gopro/train
-    patch_size : 64 #256
-    batch_size : 8 #16
+    patch_size : 256
+    batch_size : 32
     aug_mode : True
 
   test :
@@ -36,5 +36,5 @@ save:
   auto_freq : 500
 
 val:
-  freq : 10 #10000
+  freq : 10000 #10000
   windows : 256

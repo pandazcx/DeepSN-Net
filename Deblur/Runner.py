@@ -130,6 +130,7 @@ class Runner:
         if self.rank == 0:
             print(recoder)
             self.model.load_state_dict(remove_module_dict(self.checkpoints["model_state_dict"]))
+            print("model is loaded!")
 
     def save_checkpoint(self,*args):
         if self.rank == 0:
@@ -140,6 +141,8 @@ class Runner:
             torch.save(checkpoint, args[4])
 
     def save_img(self,img, folder, name):
+        img = np.transpose(img, (1, 2, 0))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         folder = os.path.join(self.save_path, folder)
         os.makedirs(folder, exist_ok=True)
         cv2.imwrite(os.path.join(folder, name), img)
@@ -263,10 +266,10 @@ class Runner:
             for batch_idx, input_data in enumerate(batch_list, 0):
                 output,cal_time = self.test_iter(input_data, self.config["val"]["windows"])
                 HQ = input_data["HQ"].to(self.rank)
-                filename = input_data["filename"]
+                filename = input_data["filename"][0]
 
                 if save_img and self.rank == 0:
-                    self.save_img(img=np.uint8(output[0,0].cpu().numpy() * 255), folder=testset,name=filename)
+                    self.save_img(img=np.uint8(output[0].cpu().numpy() * 255), folder=testset,name=filename)
 
 
                 psnr = batch_PSNR(HQ,output)
