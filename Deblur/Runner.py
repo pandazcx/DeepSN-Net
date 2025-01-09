@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 # os.environ["TORCH_DISTRIBUTED_DEBUG"] = "INFO"
 
 sys.path.append("..")
-from utils import batch_SSIM,batch_PSNR,padding,inv_padding,window_partitionx,window_reversex
+from utils import batch_SSIM,batch_PSNR,padding,inv_padding,window_partitionx,window_reversex,realblur_cal
 import Loss.loss as loss
 
 
@@ -140,12 +140,11 @@ class Runner:
                           "optimizer_state_dict": args[3]}
             torch.save(checkpoint, args[4])
 
-    def save_img(self,img, folder, name):
+    def save_img(self,img, save_path):
+        img = np.uint8(img[0].cpu().numpy() * 255)
         img = np.transpose(img, (1, 2, 0))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        folder = os.path.join(self.save_path, folder)
-        os.makedirs(folder, exist_ok=True)
-        cv2.imwrite(os.path.join(folder, name), img)
+        cv2.imwrite(save_path, img)
 
     def average_loss(self, loss):
         dist.all_reduce(loss, op=dist.ReduceOp.SUM)
@@ -214,8 +213,8 @@ class Runner:
                 if (current_idx) % self.config["val"]["freq"] == 0:
                     self.test(test_loader_dict["gopro"], "Gopro")
                     self.test(test_loader_dict["hide"], "HIDE")
-                    self.test(test_loader_dict["realblur_R"], "RealBlur-R")
-                    self.test(test_loader_dict["realblur_J"], "RealBlur-J")
+                    # self.test(test_loader_dict["realblur_R"], "RealBlur-R")
+                    # self.test(test_loader_dict["realblur_J"], "RealBlur-J")
 
 
                 if args.recode and self.rank == 0:
@@ -236,20 +235,21 @@ class Runner:
 
     def test_iter(self,input_data, windows):
         if windows < 0:
-            LQ, pad = padding(8, input_data["LQ"])
+            LQ, pad = padding(8, input_data)
             start_time = time.perf_counter()
             output = self.model(LQ.to(self.rank))
             end_time = time.perf_counter()
             output = inv_padding(pad, output)
         else:
-            _, _, H, W = input_data["LQ"].shape
-            LQ_re, batch_list = window_partitionx(input_data["LQ"], windows)
+            _, _, H, W = input_data.shape
+            LQ_re, batch_list = window_partitionx(input_data, windows)
             start_time = time.perf_counter()
             output = self.model(LQ_re.to(self.rank))
             end_time = time.perf_counter()
             output = window_reversex(output, windows, H, W, batch_list)
 
         cal_time = end_time - start_time
+        output = torch.where(torch.abs(output) > 2., 0., output)
         output = torch.clip(output, 0, 1)
         return output,cal_time
 
@@ -259,21 +259,28 @@ class Runner:
             print("======= test_%s ========"%testset)
             logging.info("======= test_%s ========"%testset)
 
+        if save_img and self.rank == 0:
+            folder = os.path.join(self.save_path, testset)
+            os.makedirs(folder, exist_ok=True)
+
         self.model.eval()
         tmp_results = {'PSNR':[],'SSIM':[], 'Time':[]}
         with torch.no_grad():
             batch_list = tqdm(test_loader) if self.rank == 0 else test_loader
             for batch_idx, input_data in enumerate(batch_list, 0):
-                output,cal_time = self.test_iter(input_data, self.config["val"]["windows"])
+                output,cal_time = self.test_iter(input_data["LQ"], self.config["val"]["windows"])
                 HQ = input_data["HQ"].to(self.rank)
                 filename = input_data["filename"][0]
 
                 if save_img and self.rank == 0:
-                    self.save_img(img=np.uint8(output[0].cpu().numpy() * 255), folder=testset,name=filename)
+                    save_path = os.path.join(folder, filename)
+                    self.save_img(img=output, save_path = save_path)
 
-
-                psnr = batch_PSNR(HQ,output)
-                ssim = batch_SSIM(HQ, output)
+                if testset == "RealBlur-R" or testset == "RealBlur-J":
+                    psnr,ssim = realblur_cal(HQ[0], output[0])
+                else:
+                    psnr = batch_PSNR(HQ,output)
+                    ssim = batch_SSIM(HQ, output)
 
                 tmp_results['Time'].append(cal_time)
                 tmp_results['PSNR'].append(psnr)
@@ -289,5 +296,27 @@ class Runner:
                 logging.info(f'{key} metric value: {aver_results[key]:.4f}')
                 print("\n")
                 print(f'{key} metric value: {aver_results[key]:.4f}')
+
+    @staticmethod
+    def load_single_img(path):
+        img = cv2.imread(path)
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) / 255.0
+        img_rgb = torch.from_numpy(img_rgb.transpose((2, 0, 1))).float()
+        return img_rgb.unsqueeze(0)
+
+
+    def single_test(self,image_path):
+        if self.rank == 0:
+            print("======= single test for %s  ========"%image_path)
+        img = self.load_single_img(image_path)
+        dir_path = os.path.dirname(image_path)
+        file_name, file_extension = os.path.splitext(os.path.basename(image_path))
+        save_path = os.path.join(dir_path, (file_name + "_output" + file_extension))
+        self.model.eval()
+        with torch.no_grad():
+            output, cal_time = self.test_iter(img, self.config["val"]["windows"])
+            self.save_img(img=output, save_path = save_path)
+        if self.rank == 0:
+            print("======= finish  ========")
 
 

@@ -68,7 +68,7 @@ def main(rank, world_size, args, port):
 
         runner.train(args,train_loader,test_loader_dict)
 
-    else:
+    elif args.mode == "test":
         if args.path == None and rank == 0:
             raise ValueError("The folder where the test weights are located needs to be provided!")
         if len((args.cuda).split(',')) > 1 and rank == 0:
@@ -78,6 +78,14 @@ def main(rank, world_size, args, port):
         runner.test(test_realblur_R_loader, "RealBlur-R", args.recode)
         runner.test(test_realblur_J_loader, "RealBlur-J", args.recode)
 
+    else:
+        if args.image == None and rank == 0:
+            raise ValueError("The image path needs to be provided!")
+        if args.path == None and rank == 0:
+            raise ValueError("The folder where the test weights are located needs to be provided!")
+        runner.single_test(args.image)
+
+
     cleanup()
 
 if __name__ == '__main__':
@@ -85,7 +93,8 @@ if __name__ == '__main__':
     parser.add_argument("-c", "--cuda", type=str, default="2,7", help="gpu to train")
     parser.add_argument("-r", "--recode", help="choose whether to recode", action="store_true")
     parser.add_argument("-p", "--path", type=str, default=None, help="pre weight path")
-    parser.add_argument("-m", "--mode", type=str, default="train", choices=["train","test"], help="choose to train or test")
+    parser.add_argument("-m", "--mode", type=str, default="train", choices=["train","test","single_test"], help="choose to train or test")
+    parser.add_argument("-i", "--image", type=str, default=None, help="image path for single test")
 
     args = parser.parse_args()
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"

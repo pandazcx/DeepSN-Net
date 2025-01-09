@@ -16,7 +16,7 @@ datasets :
 
 train :
   epoch : 2500
-  clip_grad : false
+  clip_grad : True
   loss_type : mix3  #mix1\mix2\mse\Charbonnier
 
   load :
