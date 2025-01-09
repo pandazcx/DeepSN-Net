@@ -1,0 +1,41 @@
+Task : denoise
+Version : DeepSN_Net
+datasets :
+  train :
+    path : /mnt/ssd3/zhangcx/DeepSN-Net/data/SIDD_patches/train
+    patch_size : 256
+    batch_size : 32
+    aug_mode : True
+
+  test :
+    path : /mnt/ssd3/zhangcx/DeepSN-Net/data/SIDD_patches/val
+
+  submit:
+    SIDD_path : /mnt/hdd0/zhangcx/Dataset/SIDD_benchmark/
+    DND_path : /mnt/ssd3/zhangcx/DeepSN-Net/data/DnD/
+
+
+train :
+  epoch : 400
+  clip_grad : True
+  loss_type : mix3  #mix1\mix2\mse\Charbonnier
+
+  load :
+    inherit : True
+    model : model_current.pth
+
+  optim:
+    type : AdamW #AdamW
+    init_lr : !!float 8e-4
+    weight_decay : !!float 1e-4
+    final_lr : !!float 1e-5
+    betas : [0.9,0.95]
+    scheduler_type : linear #cosine
+
+save:
+  freq : 5000
+  auto_freq : 500
+
+val:
+  freq : 10000
+  windows : -1
