@@ -1,0 +1,28 @@
+name: deepsnnet
+channels:
+  - defaults
+dependencies:
+  - pip=23.0.1
+  - python=3.10.11
+  - pip:
+      - einops==0.7.0
+      - fvcore==0.1.5.post20221221
+      - imageio==2.31.0
+      - importlib-metadata==8.5.0
+      - numpy==1.26.4
+      - opencv-python==4.7.0.72
+      - pillow==9.5.0
+      - ptflops==0.7
+      - scikit-image==0.21.0
+      - scipy==1.10.1
+      - tensorboard==2.14.1
+      - tensorboardx==2.6
+      - thop==0.1.1-2209072238
+      - torch==2.0.1
+      - torchaudio==2.0.2
+      - torchmetrics==1.6.0
+      - torchsummary==1.5.1
+      - torchvision==0.15.2
+      - tqdm==4.66.1
+
+
